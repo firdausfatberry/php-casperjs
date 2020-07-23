@@ -16,6 +16,7 @@ class Casper
     private $TAG_CURRENT_STATUS = '[CURRENT_STATUS]';
     private $TAG_CURRENT_STATUS_TEXT = '[CURRENT_STATUS_TEXT]';
     private $TAG_CURRENT_COOKIES = '[CURRENT_COOKIES]';
+    private $TAG_CURRENT_VARS = '[CURRENT_VARS]';
 
     private $debug = false;
     private $options = array();
@@ -35,6 +36,7 @@ class Casper
     private $status;
     private $statusText = '';
     private $cookies = [];
+    private $vars = false;
 
     public function __construct($path2casper = null, $tempDir = null)
     {
@@ -212,6 +214,9 @@ casper.start().then(function() {
         }
     });
 });
+
+var vars = {};
+
 
 FRAGMENT;
 
@@ -549,6 +554,22 @@ FRAGMENT;
         return $this;
     }
 
+    public function evaluateToVar($var, $function)
+    {
+        $fragment = <<<FRAGMENT
+casper.then(function() {
+    vars.$var = casper.evaluate(function() {
+        $function
+    });
+});
+
+FRAGMENT;
+
+        $this->script .= $fragment;
+
+        return $this;
+    }
+
     /**
      * @param $js
      * @return $this
@@ -585,6 +606,7 @@ casper.then(function () {
     this.echo('$this->TAG_CURRENT_STATUS' + this.currentResponse.status);
     this.echo('$this->TAG_CURRENT_STATUS_TEXT' + this.currentResponse.statusText);
     this.echo('$this->TAG_CURRENT_COOKIES' + JSON.stringify(phantom.cookies));
+    this.echo('$this->TAG_CURRENT_VARS' + JSON.stringify(vars));
 });
 
 casper.run();
@@ -641,9 +663,9 @@ FRAGMENT;
                 syslog(LOG_INFO, '[PHP-CASPERJS] ' . $outputLine);
             }
             if (strpos(
-                $outputLine,
-                $this->TAG_CURRENT_PAGE_CONTENT
-            ) !== false
+                    $outputLine,
+                    $this->TAG_CURRENT_PAGE_CONTENT
+                ) !== false
             ) {
                 $this->currentPageContent = str_replace(
                     $this->TAG_CURRENT_PAGE_CONTENT,
@@ -679,6 +701,10 @@ FRAGMENT;
 
             if (0 === strpos($outputLine, $this->TAG_CURRENT_COOKIES)) {
                 $this->cookies = json_decode(str_replace($this->TAG_CURRENT_COOKIES, '', $outputLine), true);
+            }
+
+            if (0 === strpos($outputLine, $this->TAG_CURRENT_VARS)) {
+                $this->vars = json_decode(str_replace($this->TAG_CURRENT_VARS, '', $outputLine), true);
             }
         }
     }
@@ -738,5 +764,13 @@ FRAGMENT;
     public function getCookies()
     {
         return $this->cookies;
+    }
+
+    /**
+     * @return array
+     */
+    public function getVars()
+    {
+        return $this->vars;
     }
 }
